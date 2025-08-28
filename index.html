@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Three.js Sphere (Vanilla)</title>
+    <meta name="description" content="Simple Three.js scene rendering a sphere with vanilla JS." />
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+    <noscript>You need JavaScript enabled to view this page.</noscript>
+
+    <div id="app">
+        <aside id="sidebar" aria-label="Controls panel">
+            <h1>Controls</h1>
+            <div class="control">
+                <label for="colorControl">Model color</label>
+                <input id="colorControl" type="color" value="#38bdf8" />
+            </div>
+            <div class="control">
+                <label for="modelSelect">Model</label>
+                <select id="modelSelect">
+                    <option value="/assets/models/covered_car/scene.gltf" selected>Covered car (GLTF)</option>
+                    <option value="/assets/models/sample.glb">Sample (GLB)</option>
+                    <option value="/assets/models/kosha/teste%202%20(1).glb">Kosha test (GLB)</option>
+                    <option value="/assets/models/kosha2/teste%205.glb">Kosha2 test 5 (GLB)</option>
+                    <option value="/assets/models/kosha3/teste%206.glb">Kosha3 test 6 (GLB)</option>
+                    <option value="/assets/models/kosha4/teste%207.glb">Kosha4 test 7 (GLB)</option>
+                </select>
+            </div>
+            <div class="control">
+                <button id="toggleModelSpinBtn" type="button">Resume object spin</button>
+            </div>
+            <div class="control">
+                <label><input id="enableOrbit" type="checkbox" checked /> Enable mouse orbit</label>
+            </div>
+            <div class="control">
+                <button id="toggleCinematicBtn" type="button">Start cinematic camera</button>
+            </div>
+            
+            <div class="control">
+                <button id="recenterBtn" type="button">Re-center view</button>
+            </div>
+            <div class="control">
+                <button id="snapToFloorBtn" type="button">Snap to scenario floor</button>
+            </div>
+
+            <hr />
+            <h2>Lights</h2>
+            <div class="control">
+                <label for="hemiIntensity">Hemisphere intensity</label>
+                <input id="hemiIntensity" type="range" min="0" max="2" step="0.01" value="0.6" />
+            </div>
+            <div class="control two-cols">
+                <div>
+                    <label for="hemiSky">Hemisphere sky</label>
+                    <input id="hemiSky" type="color" value="#ffffff" />
+                </div>
+                <div>
+                    <label for="hemiGround">Hemisphere ground</label>
+                    <input id="hemiGround" type="color" value="#334155" />
+                </div>
+            </div>
+            <div class="control">
+                <label for="dirIntensity">Directional intensity</label>
+                <input id="dirIntensity" type="range" min="0" max="2" step="0.01" value="1" />
+            </div>
+            <div class="control">
+                <label for="dirColor">Directional color</label>
+                <input id="dirColor" type="color" value="#ffffff" />
+            </div>
+            <div class="control two-cols">
+                <div>
+                    <label for="dirAzimuth">Azimuth (°)</label>
+                    <input id="dirAzimuth" type="range" min="0" max="360" step="1" value="35" />
+                </div>
+                <div>
+                    <label for="dirElevation">Elevation (°)</label>
+                    <input id="dirElevation" type="range" min="5" max="85" step="1" value="50" />
+                </div>
+            </div>
+
+            <hr />
+            <h2>Scenario</h2>
+            <div class="control">
+                <label for="scenarioSelect">Choose scenario</label>
+                <select id="scenarioSelect">
+                    <option value="none">None</option>
+                    <option value="modern_garage" selected>Modern garage</option>
+                    <option value="office_garage">Office garage</option>
+                    <option value="parking_lot">Parking lot</option>
+                    <option value="parking_lot_uf">Parking lot (UF)</option>
+                    <option value="sci-fi_garage">Sci‑fi garage</option>
+                </select>
+            </div>
+            <div class="control">
+                <label><input id="showFloor" type="checkbox" checked /> Show floor plane</label>
+            </div>
+            <div class="control">
+                <label for="yOffsetRange">Vertical offset (m)</label>
+                <input id="yOffsetRange" type="range" min="-1" max="1" step="0.001" value="0" />
+                <div class="row">
+                    <button id="nudgeDownBtn" type="button">-0.01</button>
+                    <span id="yOffsetValue">0.000</span>
+                    <button id="nudgeUpBtn" type="button">+0.01</button>
+                    <button id="saveScenarioOffsetBtn" type="button">Save default</button>
+                </div>
+            </div>
+
+            <hr />
+            <h2>Textures</h2>
+            <div class="control" id="textureToggles">
+                <div style="font-size:12px;opacity:0.8">Appears when a model includes baked textures.</div>
+            </div>
+
+            <div class="control" id="logoSwapControls">
+                <label for="logoImageInput">Replace logo (Material 003)</label>
+                <input id="logoImageInput" type="file" accept="image/png, image/jpeg" />
+                <div class="row">
+                    <button id="resetLogoBtn" type="button">Reset logo</button>
+                </div>
+                <div style="font-size:12px;opacity:0.8">Only active for kosha3/kosha4 models that include a material named "Material 003".</div>
+            </div>
+
+            <hr />
+            <h2>Position</h2>
+            <div class="control two-cols">
+                <div>
+                    <label>Current Y (world)</label>
+                    <div id="yAbs" style="font-size:12px;opacity:0.9">—</div>
+                </div>
+                <div>
+                    <label>Baseline Y</label>
+                    <div id="yBase" style="font-size:12px;opacity:0.9">—</div>
+                </div>
+            </div>
+            <div class="control">
+                <div class="row">
+                    <button id="yDecBtn" type="button">Y -</button>
+                    <span style="font-size:12px;opacity:0.8">Keys: PageUp/PageDown (Shift=0.001, Alt=0.1)</span>
+                    <button id="yIncBtn" type="button">Y +</button>
+                    <button id="copyPosBtn" type="button">Copy position</button>
+                </div>
+            </div>
+
+            <hr />
+            <h2>Zoom</h2>
+            <div class="control">
+                <div class="row">
+                    <button id="zoomOutBtn" type="button">Zoom -</button>
+                    <span style="font-size:12px;opacity:0.8">Clamped to model size</span>
+                    <button id="zoomInBtn" type="button">Zoom +</button>
+                </div>
+            </div>
+
+            <hr />
+            <h2>Car regions</h2>
+            <div class="control">
+                <label for="regionSelect">Select region</label>
+                <select id="regionSelect">
+                    <option value="none" selected>None</option>
+                    <option value="roof">Roof</option>
+                    <option value="hood">Hood</option>
+                    <option value="trunk">Back</option>
+                    <option value="leftDoor">Left door</option>
+                    <option value="rightDoor">Right door</option>
+                </select>
+            </div>
+            <div class="control">
+                <label for="regionColor">Selected region color</label>
+                <input id="regionColor" type="color" value="#f59e0b" />
+            </div>
+            <div class="control">
+                <label for="decalImage">Apply image to selected region (PNG/JPG)</label>
+                <input id="decalImage" type="file" accept="image/png, image/jpeg" />
+                <div class="row">
+                    <button id="clearRegionImageBtn" type="button">Clear region image</button>
+                </div>
+            </div>
+        </aside>
+        <div id="viewport" aria-label="Three.js viewport"></div>
+    </div>
+
+    <div id="loadingOverlay" aria-live="polite" role="status">
+        <div class="loader-box">
+            <div class="spinner" aria-hidden="true"></div>
+            <div id="loadingText">Loading… 0%</div>
+        </div>
+    </div>
+
+    <!-- Import map to resolve bare specifiers used by Three.js addons -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
+
+    <!-- App as ES module -->
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
+
