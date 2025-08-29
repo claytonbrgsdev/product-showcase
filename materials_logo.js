@@ -199,19 +199,19 @@ export function composeLogoIntoOriginalTexture({ mesh, materialIndex, originalTe
   const safeRectY = Math.max(0, Math.min(height - safeRectH, rectY));
   const sub = ctx.getImageData(safeRectX, safeRectY, safeRectW, safeRectH);
   const bg = estimateBackgroundColorFromBorder(sub);
-  ctx.save();
-  ctx.fillStyle = `rgb(${Math.round(bg.r)}, ${Math.round(bg.g)}, ${Math.round(bg.b)})`;
-  ctx.fillRect(safeRectX, safeRectY, safeRectW, safeRectH);
-  ctx.restore();
   const mask = buildForegroundMask(sub, bg, 28);
   const bbox = largestMaskBoundingBox(mask);
   const target = bbox || { x: 0, y: 0, w: safeRectW, h: safeRectH };
 
-  const scale = Math.min(target.w / logoImage.width, target.h / logoImage.height);
+  // Scale larger and center within the safe rectangle
+  const coverage = 2.5; // aggressively overfill beyond the safe rect
+  const availW = Math.max(1, Math.round(safeRectW * coverage));
+  const availH = Math.max(1, Math.round(safeRectH * coverage));
+  const scale = Math.min(availW / logoImage.width, availH / logoImage.height);
   const drawW = Math.max(1, Math.round(logoImage.width * scale));
   const drawH = Math.max(1, Math.round(logoImage.height * scale));
-  const dx = safeRectX + target.x + Math.round((target.w - drawW) / 2);
-  const dy = safeRectY + target.y + Math.round((target.h - drawH) / 2);
+  const dx = safeRectX + Math.round((safeRectW - drawW) / 2);
+  const dy = safeRectY + Math.round((safeRectH - drawH) / 2);
 
   try {
     const data = sub.data;
@@ -232,25 +232,9 @@ export function composeLogoIntoOriginalTexture({ mesh, materialIndex, originalTe
     ctx.putImageData(sub, safeRectX, safeRectY);
   } catch (_) {}
 
-  try {
-    const padX = Math.round(safeRectW * 0.1);
-    const padY = Math.round(safeRectH * 0.1);
-    const cx = Math.max(0, safeRectX - padX);
-    const cy = Math.max(0, safeRectY - padY);
-    const cw = Math.min(width - cx, safeRectW + 2 * padX);
-    const ch = Math.min(height - cy, safeRectH + 2 * padY);
-    ctx.save();
-    ctx.fillStyle = `rgb(${Math.round(bg.r)}, ${Math.round(bg.g)}, ${Math.round(bg.b)})`;
-    ctx.fillRect(cx, cy, cw, ch);
-    ctx.restore();
-  } catch (_) {}
+  try { /* background padding removed intentionally */ } catch (_) {}
 
   ctx.drawImage(logoImage, dx, dy, drawW, drawH);
-  ctx.save();
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.004));
-  ctx.strokeRect(dx + 0.5, dy + 0.5, Math.max(1, drawW - 1), Math.max(1, drawH - 1));
-  ctx.restore();
   return canvas;
 }
 
@@ -421,17 +405,13 @@ export async function replaceMaterial003BaseMap(modelRoot, imageUrl) {
                 }
               }
             } catch (_) { c2.clearRect(0, 0, side, side); }
-            const s = Math.min(side / uploadedImg.width, side / uploadedImg.height);
+            const overfill = 1.8; // aggressively scale up and allow cropping
+            const s = Math.max(side / uploadedImg.width, side / uploadedImg.height) * overfill;
             const dw = Math.round(uploadedImg.width * s);
             const dh = Math.round(uploadedImg.height * s);
             const ox = Math.round((side - dw) / 2);
             const oy = Math.round((side - dh) / 2);
             c2.drawImage(uploadedImg, ox, oy, dw, dh);
-            c2.save();
-            c2.strokeStyle = '#ffffff';
-            c2.lineWidth = Math.max(2, Math.round(side * 0.01));
-            c2.strokeRect(ox + 0.5, oy + 0.5, Math.max(1, dw - 1), Math.max(1, dh - 1));
-            c2.restore();
             composed = aux;
           } else {
             composed = composeLogoIntoOriginalTexture({ mesh: child, materialIndex: i, originalTexture: original, logoImage: uploadedImg });

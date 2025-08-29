@@ -11,6 +11,13 @@ export function createScenarioManager(scene) {
   let scenarioRoot = null;
   let currentScenarioKey = 'none';
 
+  // Explicit URL mapping for scenarios that don't follow the default scene.gltf path
+  /** @type {Record<string, string>} */
+  const scenarioUrlMap = {
+    // Uses GLB instead of scene.gltf
+    'vr_moody_lighting_art_gallery_scene_06': '/assets/scenarios/vr_moody_lighting_art_gallery_scene_06/vr_moody_lighting_art_gallery_scene_06.glb',
+  };
+
   function disposeScenario() {
     if (!scenarioRoot) return;
     scene.remove(scenarioRoot);
@@ -31,7 +38,7 @@ export function createScenarioManager(scene) {
     currentScenarioKey = key || 'none';
     if (!key || key === 'none') return;
 
-    const url = `/assets/scenarios/${key}/scene.gltf`;
+    const url = scenarioUrlMap[key] || `/assets/scenarios/${key}/scene.gltf`;
     const loader = new GLTFLoader();
     const draco = new DRACOLoader();
     draco.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');

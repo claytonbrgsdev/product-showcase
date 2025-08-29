@@ -14,6 +14,60 @@ export function applyColorToModel(modelRoot, hex) {
   });
 }
 
+/**
+ * Apply color to the specific mesh/material target: CUBE001 - Material.002
+ * Matches mesh name includes "CUBE001" and material name includes "Material.002" (case-insensitive).
+ */
+export function applyColorToSpecificTarget(modelRoot, hex) {
+  if (!modelRoot) return;
+  const norm = (s) => (s || '').toString().trim().toLowerCase();
+  modelRoot.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const meshName = norm(child.name);
+    if (!meshName.includes('cube001')) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const m of mats) {
+      if (!m) continue;
+      const matName = norm(m.name);
+      if (matName.includes('material.002') || /material\s*0*02/.test(matName)) {
+        if (m.color) m.color.set(hex);
+        m.needsUpdate = true;
+      }
+    }
+  });
+}
+
+/**
+ * Disable the base color map for the specific target (CUBE001 - Material.002)
+ * so that color changes are visible immediately.
+ */
+export function disableMapForSpecificTarget(modelRoot) {
+  if (!modelRoot) return;
+  const norm = (s) => (s || '').toString().trim().toLowerCase();
+  modelRoot.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const meshName = norm(child.name);
+    if (!meshName.includes('cube001')) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (let i = 0; i < mats.length; i++) {
+      const m = mats[i];
+      if (!m) continue;
+      const matName = norm(m.name);
+      if (matName.includes('material.002') || /material\s*0*02/.test(matName)) {
+        // Ensure we don't mutate shared instances
+        if (!m.userData || !m.userData._clonedForTargetColor) {
+          const cloned = m.clone();
+          cloned.userData = { ...(m.userData || {}), _clonedForTargetColor: true };
+          if (Array.isArray(child.material)) mats[i] = cloned; else child.material = cloned;
+        }
+        const mat = Array.isArray(child.material) ? child.material[i] : child.material;
+        if ('map' in mat && mat.map) { mat.map = null; }
+        mat.needsUpdate = true;
+      }
+    }
+  });
+}
+
 export function buildMaterialRegistry(modelRoot) {
   /** @type {Array<{ meshId: string, meshName: string, materialIndex: number, materialName: string, material: any }>} */
   const materialRegistry = [];

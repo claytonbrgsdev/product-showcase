@@ -11,7 +11,7 @@ import { createLoadingOverlay } from './overlay.js';
 import { createScenarioManager } from './scenarios.js';
 import { initializeCamera, enforceCameraDistanceClamp as clampCameraDistance, updateControlsTargetFromObject, frameObject, setPleasantCameraView as setPleasantView, applyZoomDelta as applyZoomDeltaExt } from './camera.js';
 import { createCinematicController } from './camera_cinematic.js';
-import { applyColorToModel as applyColorToModelExt, buildMaterialRegistry as buildMaterialRegistryExt, populateTextureTogglesFromMaterialRegistry as populateTextureTogglesFromMaterialRegistryExt } from './materials.js';
+import { applyColorToModel as applyColorToModelExt, applyColorToSpecificTarget as applyColorToSpecificTargetExt, disableMapForSpecificTarget as disableMapForSpecificTargetExt, buildMaterialRegistry as buildMaterialRegistryExt, populateTextureTogglesFromMaterialRegistry as populateTextureTogglesFromMaterialRegistryExt } from './materials.js';
 import { removeDefaultTextureMapsFromModel as removeDefaultTextureMapsFromModelExt, applyBakedTextureToModel as applyBakedTextureToModelExt, populateTextureTogglesFromModel as populateTextureTogglesFromModelExt, toggleTextureMapEnabled as toggleTextureMapEnabledExt } from './materials_baked.js';
 import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeUvBoundsForMaterial, computeRawUvBoundsForMaterial, estimateBackgroundColorFromBorder, buildForegroundMask, largestMaskBoundingBox, material003OriginalMaps, material003OriginalImages, composeLogoIntoOriginalTexture, neutralizePbrMapsForUvRect, replaceMaterial003BaseMap as replaceMaterial003BaseMapExt, restoreMaterial003BaseMap as restoreMaterial003BaseMapExt } from './materials_logo.js';
 
@@ -52,6 +52,10 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
   let renderPass = null; // RenderPass
   let bokehPass = null; // BokehPass
   let cinematic = null;
+  /** @type {THREE.DirectionalLight | null} */
+  let cineKeyLight = null;
+  /** @type {THREE.DirectionalLight | null} */
+  let cineRimLight = null;
   /** @type {Record<string, number>} */
   const scenarioYOffsetDefaults = {
     none: 0,
@@ -81,6 +85,8 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
   let resetLogoBtnEl = null;
   /** @type {HTMLInputElement | null} */
   let lineColorInputEl = null;
+  /** @type {HTMLInputElement | null} */
+  let modelColorInputEl = null;
 
   // Y offset UI refs (assigned in initialize)
   /** @type {HTMLInputElement | null} */
@@ -165,6 +171,19 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     // Cinematic controller
     cinematic = createCinematicController(camera, controls);
     cinematic.setBokehPass(bokehPass);
+    // Faster orbit defaults for cinematic mode
+    try { cinematic.setOrbitParams({ speed: 0.18, radius: 1.8, elevation: 38, elevationSway: 1.5, dwellDriftSpeed: 0.045, radiusSwayAmp: 0.02, radiusSwayHz: 0.35 }); } catch (_) {}
+    try { cinematic.setFovPulse({ enabled: false, base: 55, amplitudeDeg: 0 }); } catch (_) {}
+    try {
+      // Default takes: front 3/4, rear 3/4, side, low front, high front
+      cinematic.setTakes([
+        { azimuthDeg:   35, elevationDeg: 38, radiusFactor: 1.9, fovDeg: 55, dwellSeconds: 4.5, transitionSeconds: 1.6 },
+        { azimuthDeg:  215, elevationDeg: 36, radiusFactor: 1.9, fovDeg: 55, dwellSeconds: 4.5, transitionSeconds: 1.6 },
+        { azimuthDeg:   90, elevationDeg: 30, radiusFactor: 2.0, fovDeg: 54, dwellSeconds: 4.0, transitionSeconds: 1.4 },
+        { azimuthDeg:   25, elevationDeg: 22, radiusFactor: 2.1, fovDeg: 56, dwellSeconds: 4.0, transitionSeconds: 1.4 },
+        { azimuthDeg:   45, elevationDeg: 55, radiusFactor: 2.0, fovDeg: 55, dwellSeconds: 4.0, transitionSeconds: 1.4 },
+      ]);
+    } catch (_) {}
 
     // Orbit enable/disable toggle via checkbox
     if (enableOrbitEl) {
@@ -179,15 +198,32 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
         if (cinematic.isEnabled()) {
           cinematic.disable();
           toggleCinematicBtn.textContent = 'Start cinematic camera';
+          if (cineKeyLight) cineKeyLight.visible = false;
+          if (cineRimLight) cineRimLight.visible = false;
         } else {
           cinematic.enable();
           toggleCinematicBtn.textContent = 'Stop cinematic camera';
+          if (cineKeyLight) cineKeyLight.visible = true;
+          if (cineRimLight) cineRimLight.visible = true;
         }
       });
     }
 
     // Lights (setup and UI bindings moved to lights.js)
     const { hemi, directionalLight } = initializeLights(scene);
+
+    // Cinematic-only lights for consistent subject illumination while orbiting
+    cineKeyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    cineKeyLight.position.set(-3, 4.5, -2);
+    cineKeyLight.castShadow = false;
+    cineKeyLight.visible = false;
+    scene.add(cineKeyLight);
+
+    cineRimLight = new THREE.DirectionalLight(0x88c7ff, 0.55);
+    cineRimLight.position.set(2.5, 3.5, 3.5);
+    cineRimLight.castShadow = false;
+    cineRimLight.visible = false;
+    scene.add(cineRimLight);
 
     // Loading overlay
     overlay = createLoadingOverlay();
@@ -198,6 +234,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     modelSelectEl = /** @type {HTMLSelectElement} */ (document.getElementById('modelSelect'));
     textureTogglesEl = document.getElementById('textureToggles');
     lineColorInputEl = /** @type {HTMLInputElement} */ (document.getElementById('lineColorControl'));
+    modelColorInputEl = /** @type {HTMLInputElement} */ (document.getElementById('modelColorControl'));
     logoImageInputEl = /** @type {HTMLInputElement} */ (document.getElementById('logoImageInput'));
     resetLogoBtnEl = /** @type {HTMLButtonElement} */ (document.getElementById('resetLogoBtn'));
     const initialModelUrl = (modelSelectEl && modelSelectEl.value) || '/assets/models/kosha4/teste%2012.glb';
@@ -216,6 +253,14 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
       lineColorInputEl.addEventListener('input', () => {
         const hex = lineColorInputEl.value || '#ffffff';
         applyLineColor(hex);
+      });
+    }
+    if (modelColorInputEl) {
+      modelColorInputEl.addEventListener('input', () => {
+        const hex = modelColorInputEl.value || '#ffffff';
+        // Ensure base color map is disabled so color is visible
+        disableMapForSpecificTargetExt(modelRoot);
+        applyModelTargetColor(hex);
       });
     }
 
@@ -352,6 +397,8 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
             populateTextureTogglesFromMaterialRegistry();
             // Apply initial line color if control exists
             if (lineColorInputEl) applyLineColor(lineColorInputEl.value || '#ffffff');
+            // Apply initial model color for specific target if control exists
+            if (modelColorInputEl) applyModelTargetColor(modelColorInputEl.value || '#ffffff');
           } else {
             removeDefaultTextureMapsFromModel(true);
             applyColorToModel('#ffffff');
@@ -483,6 +530,9 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
 
   // Apply solid color to all materials
   function applyColorToModel(hex) { applyColorToModelExt(modelRoot, hex); }
+
+  // Apply color to the specific target (CUBE001 - Material.002)
+  function applyModelTargetColor(hex) { applyColorToSpecificTargetExt(modelRoot, hex); }
 
   // Build a registry of unique material instances for per-material control
   function buildMaterialRegistry() {
