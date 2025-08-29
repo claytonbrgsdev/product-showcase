@@ -6,7 +6,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
  
-import { initializeLights } from './lights.js';
+import { initializeLights, createFloorUplight } from './lights.js';
 import { createLoadingOverlay } from './overlay.js';
 import { createScenarioManager } from './scenarios.js';
 import { initializeCamera, enforceCameraDistanceClamp as clampCameraDistance, updateControlsTargetFromObject, frameObject, setPleasantCameraView as setPleasantView, applyZoomDelta as applyZoomDeltaExt } from './camera.js';
@@ -52,10 +52,6 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
   let renderPass = null; // RenderPass
   let bokehPass = null; // BokehPass
   let cinematic = null;
-  /** @type {THREE.DirectionalLight | null} */
-  let cineKeyLight = null;
-  /** @type {THREE.DirectionalLight | null} */
-  let cineRimLight = null;
   /** @type {Record<string, number>} */
   const scenarioYOffsetDefaults = {
     none: 0,
@@ -87,6 +83,19 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
   let lineColorInputEl = null;
   /** @type {HTMLInputElement | null} */
   let modelColorInputEl = null;
+
+  // Logo regions UI
+  /** @type {HTMLInputElement | null} */
+  let logoRegionFrenteEl = null;
+  /** @type {HTMLInputElement | null} */
+  let logoRegionTrasEl = null;
+  /** @type {HTMLInputElement | null} */
+  let logoRegionLateral1El = null;
+  /** @type {HTMLInputElement | null} */
+  let logoRegionLateral2El = null;
+  // Store original base maps for per-region toggle
+  /** @type {WeakMap<any, any>} */
+  const regionOriginalBaseMap = new WeakMap();
 
   // Y offset UI refs (assigned in initialize)
   /** @type {HTMLInputElement | null} */
@@ -160,7 +169,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
     bokehPass = new BokehPass(scene, camera, {
-      focus: 3.0,
+      focus: 8.0,
       aperture: 0.00025, // smaller = less blur; aperture is in terms of luminance
       maxblur: 0.01
     });
@@ -172,17 +181,23 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     cinematic = createCinematicController(camera, controls);
     cinematic.setBokehPass(bokehPass);
     // Faster orbit defaults for cinematic mode
-    try { cinematic.setOrbitParams({ speed: 0.18, radius: 1.8, elevation: 38, elevationSway: 1.5, dwellDriftSpeed: 0.045, radiusSwayAmp: 0.02, radiusSwayHz: 0.35 }); } catch (_) {}
+    try { cinematic.setOrbitParams({ speed: 0.3, radius: 1.8, elevation: 50, elevationSway: 4, dwellDriftSpeed: 0.045, radiusSwayAmp: 0.2, radiusSwayHz: 0.35 }); } catch (_) {}
     try { cinematic.setFovPulse({ enabled: false, base: 55, amplitudeDeg: 0 }); } catch (_) {}
     try {
       // Default takes: front 3/4, rear 3/4, side, low front, high front
       cinematic.setTakes([
-        { azimuthDeg:   35, elevationDeg: 38, radiusFactor: 1.9, fovDeg: 55, dwellSeconds: 4.5, transitionSeconds: 1.6 },
-        { azimuthDeg:  215, elevationDeg: 36, radiusFactor: 1.9, fovDeg: 55, dwellSeconds: 4.5, transitionSeconds: 1.6 },
-        { azimuthDeg:   90, elevationDeg: 30, radiusFactor: 2.0, fovDeg: 54, dwellSeconds: 4.0, transitionSeconds: 1.4 },
-        { azimuthDeg:   25, elevationDeg: 22, radiusFactor: 2.1, fovDeg: 56, dwellSeconds: 4.0, transitionSeconds: 1.4 },
-        { azimuthDeg:   45, elevationDeg: 55, radiusFactor: 2.0, fovDeg: 55, dwellSeconds: 4.0, transitionSeconds: 1.4 },
+        { azimuthDeg:   50, elevationDeg: 150, radiusFactor: 1.5, fovDeg: 90, dwellSeconds: 5.5, transitionSeconds: 3 },
+        { azimuthDeg:  70, elevationDeg: 70, radiusFactor: 1.9, fovDeg: 40, dwellSeconds: 5.5, transitionSeconds: 3 },
+        { azimuthDeg:   100, elevationDeg: 80, radiusFactor: 3, fovDeg: 70, dwellSeconds: 5.0, transitionSeconds: 3 },
+        { azimuthDeg:   50, elevationDeg: 100, radiusFactor: 5, fovDeg: 50, dwellSeconds: 6, transitionSeconds: 5 },
+        // { azimuthDeg:   25, elevationDeg: 22, radiusFactor: 2.1, fovDeg: 56, dwellSeconds: 4.0, transitionSeconds: 1.4 },
+        // { azimuthDeg:   45, elevationDeg: 55, radiusFactor: 2.0, fovDeg: 55, dwellSeconds: 4.0, transitionSeconds: 1.4 },
       ]);
+    } catch (_) {}
+    // Start with cinematic enabled by default
+    try {
+      cinematic.enable();
+      if (toggleCinematicBtn) toggleCinematicBtn.textContent = 'Stop cinematic camera';
     } catch (_) {}
 
     // Orbit enable/disable toggle via checkbox
@@ -192,38 +207,48 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
         if (controls) controls.enabled = !!enableOrbitEl.checked;
       });
     }
+    // Allow temporary manual orbit while in cinematic mode: pause cinematic when pointer is down,
+    // resume with a smooth blend when released.
+    try {
+      renderer.domElement.addEventListener('pointerdown', () => {
+        if (cinematic && cinematic.isEnabled()) {
+          cinematic.setManualControlActive(true);
+          if (controls) controls.enabled = true;
+        }
+      });
+      window.addEventListener('pointerup', () => {
+        if (cinematic && cinematic.isEnabled()) {
+          cinematic.setManualControlActive(false);
+          // keep controls enabled for inertia; they update each frame anyway
+        }
+      });
+    } catch (_) {}
     if (toggleCinematicBtn) {
       toggleCinematicBtn.addEventListener('click', () => {
         if (!cinematic) return;
         if (cinematic.isEnabled()) {
           cinematic.disable();
           toggleCinematicBtn.textContent = 'Start cinematic camera';
-          if (cineKeyLight) cineKeyLight.visible = false;
-          if (cineRimLight) cineRimLight.visible = false;
+          // Keep main lights active
+          try { if (directionalLight) directionalLight.visible = true; } catch (_) {}
+          try { if (directionalLight2) directionalLight2.visible = true; } catch (_) {}
+          try { if (floorUplight) floorUplight.visible = false; } catch (_) {}
         } else {
           cinematic.enable();
           toggleCinematicBtn.textContent = 'Stop cinematic camera';
-          if (cineKeyLight) cineKeyLight.visible = true;
-          if (cineRimLight) cineRimLight.visible = true;
+          // Ensure both main directional lights are active during cinematic mode
+          try { if (directionalLight) directionalLight.visible = true; } catch (_) {}
+          try { if (directionalLight2) directionalLight2.visible = true; } catch (_) {}
+          try { if (floorUplight) floorUplight.visible = true; } catch (_) {}
         }
       });
     }
 
     // Lights (setup and UI bindings moved to lights.js)
-    const { hemi, directionalLight } = initializeLights(scene);
+    const { hemi, ambient, windowHemisphere, directionalLight, directionalLight2, directionalKey, updateLightsOrbit } = initializeLights(scene);
+    const { uplight: floorUplight, updateFloorUplight } = createFloorUplight(scene);
 
-    // Cinematic-only lights for consistent subject illumination while orbiting
-    cineKeyLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    cineKeyLight.position.set(-3, 4.5, -2);
-    cineKeyLight.castShadow = false;
-    cineKeyLight.visible = false;
-    scene.add(cineKeyLight);
-
-    cineRimLight = new THREE.DirectionalLight(0x88c7ff, 0.55);
-    cineRimLight.position.set(2.5, 3.5, 3.5);
-    cineRimLight.castShadow = false;
-    cineRimLight.visible = false;
-    scene.add(cineRimLight);
+    // Main lights only; no cinematic-only lights to keep consistent lighting
 
     // Loading overlay
     overlay = createLoadingOverlay();
@@ -237,7 +262,12 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     modelColorInputEl = /** @type {HTMLInputElement} */ (document.getElementById('modelColorControl'));
     logoImageInputEl = /** @type {HTMLInputElement} */ (document.getElementById('logoImageInput'));
     resetLogoBtnEl = /** @type {HTMLButtonElement} */ (document.getElementById('resetLogoBtn'));
-    const initialModelUrl = (modelSelectEl && modelSelectEl.value) || '/assets/models/kosha4/teste%2012.glb';
+    // Logo region controls
+    logoRegionFrenteEl = /** @type {HTMLInputElement} */ (document.getElementById('logoRegionFrente'));
+    logoRegionTrasEl = /** @type {HTMLInputElement} */ (document.getElementById('logoRegionTras'));
+    logoRegionLateral1El = /** @type {HTMLInputElement} */ (document.getElementById('logoRegionLateral1'));
+    logoRegionLateral2El = /** @type {HTMLInputElement} */ (document.getElementById('logoRegionLateral2'));
+    const initialModelUrl = (modelSelectEl && modelSelectEl.value) || '/assets/models/kosha4/teste11.glb';
     console.log('[loader] loading', initialModelUrl);
     loadGltfModel(initialModelUrl, (p) => overlay.setProgress(p), () => overlay.hide());
 
@@ -276,6 +306,12 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     if (resetLogoBtnEl) {
       resetLogoBtnEl.addEventListener('click', () => restoreMaterial003BaseMap());
     }
+    // Region toggles: apply per-mesh Material 003 map on/off
+    const onRegionChange = () => applyLogoRegionsFromUI();
+    if (logoRegionFrenteEl) logoRegionFrenteEl.addEventListener('change', onRegionChange);
+    if (logoRegionTrasEl) logoRegionTrasEl.addEventListener('change', onRegionChange);
+    if (logoRegionLateral1El) logoRegionLateral1El.addEventListener('change', onRegionChange);
+    if (logoRegionLateral2El) logoRegionLateral2El.addEventListener('change', onRegionChange);
     if (toggleModelSpinBtnEl) {
       toggleModelSpinBtnEl.addEventListener('click', () => {
         isModelSpinning = !isModelSpinning;
@@ -360,6 +396,9 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
       // Enforce distance clamp after control updates
       clampCameraDistance(camera, controls);
     }
+    // Update lights orbiting (use fixed timestep ~16ms)
+    try { updateLightsOrbit && updateLightsOrbit(0.016, modelRoot); } catch (_) {}
+    try { updateFloorUplight && updateFloorUplight(modelRoot); } catch (_) {}
     if (cinematic && cinematic.isEnabled()) {
       // Approx delta since requestAnimationFrame gives timestamp in ms
       cinematic.update(0.016, modelRoot);
@@ -399,6 +438,8 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
             if (lineColorInputEl) applyLineColor(lineColorInputEl.value || '#ffffff');
             // Apply initial model color for specific target if control exists
             if (modelColorInputEl) applyModelTargetColor(modelColorInputEl.value || '#ffffff');
+            // Apply logo regions UI state if present
+            applyLogoRegionsFromUI();
           } else {
             removeDefaultTextureMapsFromModel(true);
             applyColorToModel('#ffffff');
@@ -541,6 +582,53 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
 
   function populateTextureTogglesFromMaterialRegistry() {
     populateTextureTogglesFromMaterialRegistryExt(textureTogglesEl, materialRegistry);
+  }
+
+  // ===== Logo Regions: enable/disable Material 003 per mesh =====
+  const regionNameMap = {
+    frente: /\bcube[\s._-]*0*04(?!\d)/i,
+    tras: /\bcube[\s._-]*0*03(?!\d)/i,
+    lateral1: /\bcube[\s._-]*0*02(?!\d)/i,
+    lateral2: /^\s*cube\s*$/i,
+  };
+
+  function setMaterial003EnabledOnMesh(mesh, enabled) {
+    if (!mesh || !mesh.material) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (let i = 0; i < mats.length; i++) {
+      const m = mats[i];
+      if (!m || typeof m.name !== 'string') continue;
+      const isMat003 = /material[\s._-]*0*03/i.test(m.name);
+      if (!isMat003) continue;
+      // Ensure per-mesh isolation so toggling visibility doesn't affect other meshes
+      if (!m.userData || !m.userData._clonedForLogoRegion) {
+        const cloned = m.clone();
+        cloned.userData = { ...(m.userData || {}), _clonedForLogoRegion: true };
+        if (Array.isArray(mesh.material)) mesh.material[i] = cloned; else mesh.material = cloned;
+      }
+      const mat = Array.isArray(mesh.material) ? mesh.material[i] : mesh.material;
+      mat.visible = !!enabled; // only affect visualization, keep maps intact
+      mat.needsUpdate = true;
+    }
+  }
+
+  function applyLogoRegionsFromUI() {
+    if (!modelRoot) return;
+    const frenteOn = logoRegionFrenteEl ? !!logoRegionFrenteEl.checked : true;
+    const trasOn = logoRegionTrasEl ? !!logoRegionTrasEl.checked : true;
+    const lat1On = logoRegionLateral1El ? !!logoRegionLateral1El.checked : true;
+    const lat2On = logoRegionLateral2El ? !!logoRegionLateral2El.checked : true;
+    const norm = (s) => (s || '').toString();
+    modelRoot.traverse((child) => {
+      if (!child.isMesh) return;
+      const name = norm(child.name);
+      // Some exporters use uppercase/lowercase variations; normalize for regex test
+      const lname = name.toLowerCase();
+      if (regionNameMap.frente.test(name)) setMaterial003EnabledOnMesh(child, frenteOn);
+      else if (regionNameMap.tras.test(name)) setMaterial003EnabledOnMesh(child, trasOn);
+      else if (regionNameMap.lateral1.test(name)) setMaterial003EnabledOnMesh(child, lat1On);
+      else if (regionNameMap.lateral2.test(name)) setMaterial003EnabledOnMesh(child, lat2On);
+    });
   }
 
   // ===== Model: Normalize & Camera Bounds =====

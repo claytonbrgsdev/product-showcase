@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,125 +8,58 @@
     <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-    <noscript>You need JavaScript enabled to view this page.</noscript>
+    <noscript>Você precisa habilitar JavaScript para ver esta página.</noscript>
 
     <div id="app">
-        <aside id="sidebar" aria-label="Controls panel">
-            <h1>Controls</h1>
+        <aside id="sidebar" aria-label="Painel de controles">
+            <h1>Controles</h1>
             <hr />
-            <h2>User controls</h2>
+            <h2>Controles do usuário</h2>
             <div id="userControls">
                 <div class="control">
-                    <label for="scenarioSelect">Choose scenario</label>
+                    <label for="scenarioSelect">Escolha o cenário</label>
                     <select id="scenarioSelect">
-                        <option value="modern_garage" selected>Modern garage</option>
-                        <option value="sci-fi_garage">Sci‑fi garage</option>
-                        <option value="vr_moody_lighting_art_gallery_scene_06">VR moody art gallery 06</option>
+                        <option value="modern_garage" selected>Galpão</option>
+                        <option value="sci-fi_garage">Show Room</option>
+                        <option value="vr_moody_lighting_art_gallery_scene_06">Galeria de arte 06 (VR)</option>
                     </select>
                 </div>
+                <!--
                 <div class="control">
-                    <label for="lineColorControl">Line color (LINHAS • Linha)</label>
+                    <label for="modelSelect">Modelo</label>
+                    <select id="modelSelect" disabled>
+                        <option value="/assets/models/kosha4/teste7.glb">Kosha4 teste 7 (GLB)</option>
+                        <option value="/assets/models/kosha4/teste10.glb">Kosha4 teste 10 (GLB)</option>
+                        <option value="/assets/models/kosha4/teste11.glb" selected>Kosha4 teste 11 (GLB)</option>
+                        <option value="/assets/models/kosha4/teste12.glb">Kosha4 teste 12 (GLB)</option>
+                    </select>
+                </div>
+                -->
+                <div class="control">
+                    <label for="lineColorControl">Cor das linhas (LINHAS • Linha)</label>
                     <input id="lineColorControl" type="color" value="#ffffff" />
                 </div>
                 <div class="control">
-                    <label for="modelColorControl">Model color (CUBE001 - Material.002)</label>
+                    <label for="modelColorControl">Cor do modelo (CUBE001 - Material.002)</label>
                     <input id="modelColorControl" type="color" value="#ffffff" />
                 </div>
-            </div>
-            <hr />
-            <h2>Admin controls</h2>
-            <div id="adminControls">
-            <div class="control">
-                <label for="modelSelect">Model</label>
-                <select id="modelSelect">
-                    <option value="/assets/models/kosha4/teste%207.glb">Kosha4 test 7 (GLB)</option>
-                    <option value="/assets/models/kosha4/teste%2010.glb">Kosha4 test 10 (GLB)</option>
-                    <option value="/assets/models/kosha4/teste%2011.glb">Kosha4 test 11 (GLB)</option>
-                    <option value="/assets/models/kosha4/teste%2012.glb" selected>Kosha4 test 12 (GLB)</option>
-                </select>
-            </div>
-            <div class="control">
-                <button id="toggleModelSpinBtn" type="button">Resume object spin</button>
-            </div>
-            <div class="control">
-                <label><input id="enableOrbit" type="checkbox" checked /> Enable mouse orbit</label>
-            </div>
-            <div class="control">
-                <button id="toggleCinematicBtn" type="button">Start cinematic camera</button>
+                <div class="control" id="logoRegionsControls">
+                    <label>Regiões da logo</label>
+                    <div class="row">
+                        <label><input id="logoRegionFrente" type="checkbox" checked /> Frente</label>
+                    </div>
+                    <div class="row">
+                        <label><input id="logoRegionTras" type="checkbox" checked /> Trás</label>
+                    </div>
+                    <div class="row">
+                        <label><input id="logoRegionLateral1" type="checkbox" checked /> Lateral 1</label>
+                    </div>
+                    <div class="row">
+                        <label><input id="logoRegionLateral2" type="checkbox" checked /> Lateral 2</label>
+                    </div>
+                </div>
             </div>
             
-            <div class="control">
-                <button id="recenterBtn" type="button">Re-center view</button>
-            </div>
-            <div class="control">
-                <button id="snapToFloorBtn" type="button">Snap to scenario floor</button>
-            </div>
-
-            <hr />
-            <h2>Lights</h2>
-            <div class="control">
-                <label for="hemiIntensity">Hemisphere intensity</label>
-                <input id="hemiIntensity" type="range" min="0" max="2" step="0.01" value="0.6" />
-            </div>
-            <div class="control two-cols">
-                <div>
-                    <label for="hemiSky">Hemisphere sky</label>
-                    <input id="hemiSky" type="color" value="#ffffff" />
-                </div>
-                <div>
-                    <label for="hemiGround">Hemisphere ground</label>
-                    <input id="hemiGround" type="color" value="#334155" />
-                </div>
-            </div>
-            <div class="control">
-                <label for="dirIntensity">Directional intensity</label>
-                <input id="dirIntensity" type="range" min="0" max="2" step="0.01" value="1" />
-            </div>
-            <div class="control">
-                <label for="dirColor">Directional color</label>
-                <input id="dirColor" type="color" value="#ffffff" />
-            </div>
-            <div class="control two-cols">
-                <div>
-                    <label for="dirAzimuth">Azimuth (°)</label>
-                    <input id="dirAzimuth" type="range" min="0" max="360" step="1" value="35" />
-                </div>
-                <div>
-                    <label for="dirElevation">Elevation (°)</label>
-                    <input id="dirElevation" type="range" min="5" max="85" step="1" value="50" />
-                </div>
-            </div>
-
-            
-
-            <hr />
-            <h2>Textures</h2>
-            <div class="control" id="textureToggles">
-                <div style="font-size:12px;opacity:0.8">Appears when a model includes baked textures.</div>
-            </div>
-
-            <div class="control" id="logoSwapControls">
-                <label for="logoImageInput">Replace logo (Material 003)</label>
-                <input id="logoImageInput" type="file" accept="image/png, image/jpeg" />
-                <div class="row">
-                    <button id="resetLogoBtn" type="button">Reset logo</button>
-                </div>
-                <div style="font-size:12px;opacity:0.8">Only active for kosha4 models that include a material named "Material 003".</div>
-            </div>
-
-            
-
-            <hr />
-            <h2>Zoom</h2>
-            <div class="control">
-                <div class="row">
-                    <button id="zoomOutBtn" type="button">Zoom -</button>
-                    <span style="font-size:12px;opacity:0.8">Clamped to model size</span>
-                    <button id="zoomInBtn" type="button">Zoom +</button>
-                </div>
-            </div>
-
-            </div>
 
         </aside>
         <div id="viewport" aria-label="Three.js viewport"></div>
@@ -135,7 +68,7 @@
     <div id="loadingOverlay" aria-live="polite" role="status">
         <div class="loader-box">
             <div class="spinner" aria-hidden="true"></div>
-            <div id="loadingText">Loading… 0%</div>
+            <div id="loadingText">Carregando… 0%</div>
         </div>
     </div>
 

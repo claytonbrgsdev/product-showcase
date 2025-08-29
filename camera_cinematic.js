@@ -39,6 +39,13 @@ export function createCinematicController(camera, controls) {
   const defaultDwell = 4.0;
   const defaultTransition = 1.6;
 
+  // Manual override while user drags: pause updates and blend back after release
+  let manualOverride = false;
+  let resumeBlendDuration = 1.2;
+  let resumeBlendRemaining = 0;
+  const resumeStartPos = new THREE.Vector3();
+  let resumeStartFov = 55;
+
   function enable() {
     enabled = true;
     timeSeconds = 0;
@@ -91,6 +98,23 @@ export function createCinematicController(camera, controls) {
     if (typeof amplitudeDeg === 'number' && isFinite(amplitudeDeg)) fovPulseAmplitudeDeg = Math.max(0, Math.min(25, amplitudeDeg));
   }
 
+  /** Enable/disable manual control override during drag. */
+  function setManualControlActive(active) {
+    manualOverride = !!active;
+    if (!manualOverride) {
+      resumeBlendRemaining = resumeBlendDuration;
+      resumeStartPos.copy(camera.position);
+      resumeStartFov = camera.fov;
+    }
+  }
+
+  /** Configure the blend time used when resuming after manual drag. */
+  function setResumeBlendSeconds(seconds) {
+    if (typeof seconds === 'number' && isFinite(seconds)) {
+      resumeBlendDuration = Math.max(0, seconds);
+    }
+  }
+
   /**
    * Define a sequence of takes (angles) for cinematic mode.
    * @param {Array<{ azimuthDeg: number, elevationDeg?: number, radiusFactor?: number, fovDeg?: number, dwellSeconds?: number, transitionSeconds?: number }>} list
@@ -113,6 +137,9 @@ export function createCinematicController(camera, controls) {
     timeSeconds += Math.max(0, deltaSeconds || 0);
     continuousAzimuthOffset += Math.max(0, deltaSeconds || 0) * dwellDriftSpeedRadPerSec;
 
+    // If the user is manually controlling, skip cinematic updates
+    if (manualOverride) return;
+
     const box = new THREE.Box3().setFromObject(subjectRoot);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
@@ -130,11 +157,11 @@ export function createCinematicController(camera, controls) {
     let fovNow = baseFovDeg;
 
     if (takesActive && takes.length) {
-      const a = takes[currentTakeIndex];
-      const nextIndex = (currentTakeIndex + 1) % takes.length;
-      const b = takes[nextIndex];
-      const dwell = (a.dwellSeconds != null ? a.dwellSeconds : defaultDwell);
-      const tdur = (a.transitionSeconds != null ? a.transitionSeconds : defaultTransition);
+      let a = takes[currentTakeIndex];
+      let nextIndex = (currentTakeIndex + 1) % takes.length;
+      let b = takes[nextIndex];
+      let dwell = (a.dwellSeconds != null ? a.dwellSeconds : defaultDwell);
+      let tdur = (a.transitionSeconds != null ? a.transitionSeconds : defaultTransition);
 
       // Advance phase timing
       phaseTime += Math.max(0, deltaSeconds || 0);
@@ -142,9 +169,16 @@ export function createCinematicController(camera, controls) {
         phase = 'transition';
         phaseTime = 0;
       } else if (phase === 'transition' && phaseTime >= tdur) {
+        // Finish transition: advance to next take for the dwell phase
         phase = 'dwell';
         currentTakeIndex = nextIndex;
         phaseTime = 0;
+        // Refresh references so this frame uses the new current take
+        a = takes[currentTakeIndex];
+        nextIndex = (currentTakeIndex + 1) % takes.length;
+        b = takes[nextIndex];
+        dwell = (a.dwellSeconds != null ? a.dwellSeconds : defaultDwell);
+        tdur = (a.transitionSeconds != null ? a.transitionSeconds : defaultTransition);
       }
 
       const azA = THREE.MathUtils.degToRad(a.azimuthDeg || 0);
@@ -192,7 +226,19 @@ export function createCinematicController(camera, controls) {
     const x = center.x + orbitRadius * sinPhi * Math.cos(azimuthRad);
     const z = center.z + orbitRadius * sinPhi * Math.sin(azimuthRad);
     const y = center.y + orbitRadius * cosPhi;
-    camera.position.set(x, y, z);
+    if (resumeBlendRemaining > 0) {
+      const t = 1 - Math.max(0, resumeBlendRemaining / Math.max(1e-6, resumeBlendDuration));
+      const tt = easeInOut(Math.max(0, Math.min(1, t)));
+      const target = new THREE.Vector3(x, y, z);
+      camera.position.set(
+        THREE.MathUtils.lerp(resumeStartPos.x, target.x, tt),
+        THREE.MathUtils.lerp(resumeStartPos.y, target.y, tt),
+        THREE.MathUtils.lerp(resumeStartPos.z, target.z, tt)
+      );
+      resumeBlendRemaining -= Math.max(0, deltaSeconds || 0);
+    } else {
+      camera.position.set(x, y, z);
+    }
     camera.up.set(0, 1, 0);
     camera.lookAt(center);
 
@@ -200,7 +246,14 @@ export function createCinematicController(camera, controls) {
     if (fovPulseEnabled && fovPulseAmplitudeDeg > 0) {
       camera.fov = (fovNow || baseFovDeg) + Math.sin(timeSeconds * 0.6) * fovPulseAmplitudeDeg;
     } else {
-      camera.fov = (fovNow || baseFovDeg);
+      const targetFov = (fovNow || baseFovDeg);
+      if (resumeBlendRemaining > 0) {
+        const t = 1 - Math.max(0, resumeBlendRemaining / Math.max(1e-6, resumeBlendDuration));
+        const tt = easeInOut(Math.max(0, Math.min(1, t)));
+        camera.fov = THREE.MathUtils.lerp(resumeStartFov, targetFov, tt);
+      } else {
+        camera.fov = targetFov;
+      }
     }
     camera.updateProjectionMatrix();
     camera.rotation.z = 0; // avoid roll
@@ -214,7 +267,7 @@ export function createCinematicController(camera, controls) {
     }
   }
 
-  return { enable, disable, isEnabled, setBokehPass, setOrbitParams, setFovPulse, setTakes, update };
+  return { enable, disable, isEnabled, setBokehPass, setOrbitParams, setFovPulse, setTakes, setManualControlActive, setResumeBlendSeconds, update };
 }
 
 
