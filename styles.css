@@ -154,7 +154,5 @@ select {
   color: #e2e8f0;
 }
 
-.region-highlight {
-  outline: 2px solid #f59e0b !important;
-}
+/* Removed region highlight styles */
 

@@ -14,18 +14,12 @@
         <aside id="sidebar" aria-label="Controls panel">
             <h1>Controls</h1>
             <div class="control">
-                <label for="colorControl">Model color</label>
-                <input id="colorControl" type="color" value="#38bdf8" />
-            </div>
-            <div class="control">
                 <label for="modelSelect">Model</label>
                 <select id="modelSelect">
-                    <option value="/assets/models/covered_car/scene.gltf" selected>Covered car (GLTF)</option>
-                    <option value="/assets/models/sample.glb">Sample (GLB)</option>
-                    <option value="/assets/models/kosha/teste%202%20(1).glb">Kosha test (GLB)</option>
-                    <option value="/assets/models/kosha2/teste%205.glb">Kosha2 test 5 (GLB)</option>
-                    <option value="/assets/models/kosha3/teste%206.glb">Kosha3 test 6 (GLB)</option>
                     <option value="/assets/models/kosha4/teste%207.glb">Kosha4 test 7 (GLB)</option>
+                    <option value="/assets/models/kosha4/teste%2010.glb">Kosha4 test 10 (GLB)</option>
+                    <option value="/assets/models/kosha4/teste%2011.glb">Kosha4 test 11 (GLB)</option>
+                    <option value="/assets/models/kosha4/teste%2012.glb" selected>Kosha4 test 12 (GLB)</option>
                 </select>
             </div>
             <div class="control">
@@ -85,11 +79,7 @@
             <div class="control">
                 <label for="scenarioSelect">Choose scenario</label>
                 <select id="scenarioSelect">
-                    <option value="none">None</option>
                     <option value="modern_garage" selected>Modern garage</option>
-                    <option value="office_garage">Office garage</option>
-                    <option value="parking_lot">Parking lot</option>
-                    <option value="parking_lot_uf">Parking lot (UF)</option>
                     <option value="sci-fi_garage">Sci‑fi garage</option>
                 </select>
             </div>
@@ -119,7 +109,7 @@
                 <div class="row">
                     <button id="resetLogoBtn" type="button">Reset logo</button>
                 </div>
-                <div style="font-size:12px;opacity:0.8">Only active for kosha3/kosha4 models that include a material named "Material 003".</div>
+                <div style="font-size:12px;opacity:0.8">Only active for kosha4 models that include a material named "Material 003".</div>
             </div>
 
             <hr />
@@ -153,30 +143,6 @@
                 </div>
             </div>
 
-            <hr />
-            <h2>Car regions</h2>
-            <div class="control">
-                <label for="regionSelect">Select region</label>
-                <select id="regionSelect">
-                    <option value="none" selected>None</option>
-                    <option value="roof">Roof</option>
-                    <option value="hood">Hood</option>
-                    <option value="trunk">Back</option>
-                    <option value="leftDoor">Left door</option>
-                    <option value="rightDoor">Right door</option>
-                </select>
-            </div>
-            <div class="control">
-                <label for="regionColor">Selected region color</label>
-                <input id="regionColor" type="color" value="#f59e0b" />
-            </div>
-            <div class="control">
-                <label for="decalImage">Apply image to selected region (PNG/JPG)</label>
-                <input id="decalImage" type="file" accept="image/png, image/jpeg" />
-                <div class="row">
-                    <button id="clearRegionImageBtn" type="button">Clear region image</button>
-                </div>
-            </div>
         </aside>
         <div id="viewport" aria-label="Three.js viewport"></div>
     </div>
