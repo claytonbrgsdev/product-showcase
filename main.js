@@ -132,6 +132,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     toggleModelSpinBtnEl = /** @type {HTMLButtonElement} */ (document.getElementById('toggleModelSpinBtn'));
     enableOrbitEl = /** @type {HTMLInputElement} */ (document.getElementById('enableOrbit'));
     const toggleCinematicBtn = /** @type {HTMLButtonElement} */ (document.getElementById('toggleCinematicBtn'));
+    const restartCinematicBtn = /** @type {HTMLButtonElement} */ (document.getElementById('restartCinematicBtn'));
     
     recenterBtnEl = /** @type {HTMLButtonElement} */ (document.getElementById('recenterBtn'));
     snapToFloorBtnEl = /** @type {HTMLButtonElement} */ (document.getElementById('snapToFloorBtn'));
@@ -183,6 +184,8 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     // Faster orbit defaults for cinematic mode
     try { cinematic.setOrbitParams({ speed: 0.3, radius: 1.8, elevation: 50, elevationSway: 4, dwellDriftSpeed: 0.045, radiusSwayAmp: 0.2, radiusSwayHz: 0.35 }); } catch (_) {}
     try { cinematic.setFovPulse({ enabled: false, base: 55, amplitudeDeg: 0 }); } catch (_) {}
+    // Longer resume blend after manual drag (couple of seconds)
+    try { cinematic.setResumeBlendSeconds(3.0); } catch (_) {}
     try {
       // Default takes: front 3/4, rear 3/4, side, low front, high front
       cinematic.setTakes([
@@ -211,16 +214,17 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     // resume with a smooth blend when released.
     try {
       renderer.domElement.addEventListener('pointerdown', () => {
-        if (cinematic && cinematic.isEnabled()) {
-          cinematic.setManualControlActive(true);
-          if (controls) controls.enabled = true;
-        }
+        if (!cinematic) return;
+        // Pause cinematic motion but keep it enabled (lights/DOF remain)
+        cinematic.setManualControlActive(true);
+        if (restartCinematicBtn) restartCinematicBtn.style.display = '';
+        if (controls) controls.enabled = true;
       });
-      window.addEventListener('pointerup', () => {
-        if (cinematic && cinematic.isEnabled()) {
-          cinematic.setManualControlActive(false);
-          // keep controls enabled for inertia; they update each frame anyway
-        }
+      if (restartCinematicBtn) restartCinematicBtn.addEventListener('click', () => {
+        if (!cinematic) return;
+        // Resume cinematic motion smoothly
+        cinematic.setManualControlActive(false);
+        if (restartCinematicBtn) restartCinematicBtn.style.display = 'none';
       });
     } catch (_) {}
     if (toggleCinematicBtn) {

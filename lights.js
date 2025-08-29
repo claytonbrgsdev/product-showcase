@@ -204,22 +204,22 @@ export function createShowRoomLights(scene) {
   group.visible = false; // off by default; enabled only for Show Room
 
   // Clean, bright showroom key/fill/rim
-  const srAmbient = new THREE.AmbientLight(0xffffff, 0.1);
+  const srAmbient = new THREE.AmbientLight(0xFF0000, 4);
   group.add(srAmbient);
 
-  const srKey = new THREE.DirectionalLight(0xffffff, 1.6);
+  const srKey = new THREE.DirectionalLight(0xffffff, 3);
   srKey.position.set(2.5, 4.5, 2.0);
   srKey.castShadow = true;
   srKey.shadow.mapSize.set(2048, 2048);
   group.add(srKey);
   group.add(srKey.target);
 
-  const srFill = new THREE.DirectionalLight(0xffffff, 0.8);
+  const srFill = new THREE.DirectionalLight(0xffffff, 3);
   srFill.position.set(-2.0, 3.0, -1.5);
   group.add(srFill);
   group.add(srFill.target);
 
-  const srRim = new THREE.DirectionalLight(0xffffff, 0.9);
+  const srRim = new THREE.DirectionalLight(0xffffff, 3);
   srRim.position.set(0.0, 3.5, -3.5);
   group.add(srRim);
   group.add(srRim.target);
@@ -229,6 +229,16 @@ export function createShowRoomLights(scene) {
   srUp.position.set(0, 0.08, 0);
   group.add(srUp);
   group.add(srUp.target);
+
+  // Wall wash spotlights to illuminate inner walls (cardinal directions)
+  const wallIntensity = 0.45;
+  const wallAngle = Math.PI / 5;
+  const wallDistance = 40;
+  const spWallPosX = new THREE.SpotLight(0xffffff, wallIntensity, wallDistance, wallAngle, 0.35, 1.0);
+  const spWallNegX = new THREE.SpotLight(0xffffff, wallIntensity, wallDistance, wallAngle, 0.35, 1.0);
+  const spWallPosZ = new THREE.SpotLight(0xffffff, wallIntensity, wallDistance, wallAngle, 0.35, 1.0);
+  const spWallNegZ = new THREE.SpotLight(0xffffff, wallIntensity, wallDistance, wallAngle, 0.35, 1.0);
+  [spWallPosX, spWallNegX, spWallPosZ, spWallNegZ].forEach((s) => { s.castShadow = false; group.add(s); group.add(s.target); });
 
   scene.add(group);
 
@@ -245,10 +255,25 @@ export function createShowRoomLights(scene) {
       srFill.target.position.copy(center);
       srRim.target.position.copy(center);
       srUp.target.position.set(center.x, center.y + radius * 0.6, center.z);
+      // Position wall wash spots near center, aiming outwards toward the walls
+      const yWash = center.y + Math.max(1.5, radius * 0.7);
+      const reach = Math.max(8, radius * 4);
+      spWallPosX.position.set(center.x, yWash, center.z);
+      spWallPosX.target.position.set(center.x + reach, yWash, center.z);
+      spWallNegX.position.set(center.x, yWash, center.z);
+      spWallNegX.target.position.set(center.x - reach, yWash, center.z);
+      spWallPosZ.position.set(center.x, yWash, center.z);
+      spWallPosZ.target.position.set(center.x, yWash, center.z + reach);
+      spWallNegZ.position.set(center.x, yWash, center.z);
+      spWallNegZ.target.position.set(center.x, yWash, center.z - reach);
       srKey.target.updateMatrixWorld();
       srFill.target.updateMatrixWorld();
       srRim.target.updateMatrixWorld();
       srUp.target.updateMatrixWorld();
+      spWallPosX.target.updateMatrixWorld();
+      spWallNegX.target.updateMatrixWorld();
+      spWallPosZ.target.updateMatrixWorld();
+      spWallNegZ.target.updateMatrixWorld();
     } catch (_) {}
   }
 

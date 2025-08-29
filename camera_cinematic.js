@@ -125,6 +125,16 @@ export function createCinematicController(camera, controls) {
     phase = 'dwell';
     phaseTime = 0;
     takesActive = takes.length > 0;
+    // Sanitize takes: clamp elevation to a safe range to prevent pole-crossing flips
+    takes = takes.map((a) => {
+      if (a && typeof a.elevationDeg === 'number' && isFinite(a.elevationDeg)) {
+        const e = Math.max(15, Math.min(80, a.elevationDeg));
+        if (e !== a.elevationDeg) {
+          return { ...a, elevationDeg: e };
+        }
+      }
+      return a;
+    });
   }
 
   /**
@@ -239,8 +249,21 @@ export function createCinematicController(camera, controls) {
     } else {
       camera.position.set(x, y, z);
     }
-    camera.up.set(0, 1, 0);
-    camera.lookAt(center);
+    // Build a bank-free camera orientation relative to world-up to avoid upside-down flips
+    const forward = center.clone().sub(camera.position).normalize();
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    let right = new THREE.Vector3().crossVectors(forward, worldUp);
+    // Handle the rare case where forward is (near-)parallel to worldUp
+    if (right.lengthSq() < 1e-6) {
+      forward.x += 1e-4;
+      forward.normalize();
+      right = new THREE.Vector3().crossVectors(forward, worldUp);
+    }
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+    const viewMatrix = new THREE.Matrix4().makeBasis(right, up, forward.clone().negate());
+    camera.quaternion.setFromRotationMatrix(viewMatrix);
+    camera.up.copy(up);
 
     // FOV (optional pulsing)
     if (fovPulseEnabled && fovPulseAmplitudeDeg > 0) {
@@ -256,7 +279,6 @@ export function createCinematicController(camera, controls) {
       }
     }
     camera.updateProjectionMatrix();
-    camera.rotation.z = 0; // avoid roll
 
     // Update DOF uniforms if Bokeh is present
     if (bokehPass) {
