@@ -267,7 +267,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     logoRegionTrasEl = /** @type {HTMLInputElement} */ (document.getElementById('logoRegionTras'));
     logoRegionLateral1El = /** @type {HTMLInputElement} */ (document.getElementById('logoRegionLateral1'));
     logoRegionLateral2El = /** @type {HTMLInputElement} */ (document.getElementById('logoRegionLateral2'));
-    const initialModelUrl = (modelSelectEl && modelSelectEl.value) || '/assets/models/kosha4/teste11.glb';
+    const initialModelUrl = (modelSelectEl && modelSelectEl.value) || './assets/models/kosha4/teste11.glb';
     console.log('[loader] loading', initialModelUrl);
     loadGltfModel(initialModelUrl, (p) => overlay.setProgress(p), () => overlay.hide());
 
@@ -428,7 +428,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
         updateControlDistanceLimitsFromModel();
         // Apply materials/textures per model
         try {
-          if (typeof path === 'string' && path.includes('/assets/models/kosha4/')) {
+          if (typeof path === 'string' && path.includes('assets/models/kosha4/')) {
             // Kosha4: full per-material controls
             removeDefaultTextureMapsFromModel(false);
             applyColorToModel('#ffffff');
