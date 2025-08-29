@@ -59,7 +59,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     office_garage: -0.10,
     parking_lot: 0.12,
     parking_lot_uf: 0.18,
-    'sci-fi_garage': 0.6608831037132148
+    'sci-fi_garage': 0.0
   };
   let currentScenarioKey = 'modern_garage';
   let userYOffset = 0; // live override via UI
@@ -79,6 +79,8 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
   let logoImageInputEl = null;
   /** @type {HTMLButtonElement | null} */
   let resetLogoBtnEl = null;
+  /** @type {HTMLInputElement | null} */
+  let lineColorInputEl = null;
 
   // Y offset UI refs (assigned in initialize)
   /** @type {HTMLInputElement | null} */
@@ -195,6 +197,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     // Load model (from selector if present)
     modelSelectEl = /** @type {HTMLSelectElement} */ (document.getElementById('modelSelect'));
     textureTogglesEl = document.getElementById('textureToggles');
+    lineColorInputEl = /** @type {HTMLInputElement} */ (document.getElementById('lineColorControl'));
     logoImageInputEl = /** @type {HTMLInputElement} */ (document.getElementById('logoImageInput'));
     resetLogoBtnEl = /** @type {HTMLButtonElement} */ (document.getElementById('resetLogoBtn'));
     const initialModelUrl = (modelSelectEl && modelSelectEl.value) || '/assets/models/kosha4/teste%2012.glb';
@@ -206,6 +209,13 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     if (modelSelectEl) {
       modelSelectEl.addEventListener('change', () => {
         if (modelSelectEl) switchModel(modelSelectEl.value);
+      });
+    }
+
+    if (lineColorInputEl) {
+      lineColorInputEl.addEventListener('input', () => {
+        const hex = lineColorInputEl.value || '#ffffff';
+        applyLineColor(hex);
       });
     }
 
@@ -243,69 +253,29 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
 
     // Scenario controls
     const scenarioSelect = /** @type {HTMLSelectElement} */ (document.getElementById('scenarioSelect'));
-    const showFloorCheckbox = /** @type {HTMLInputElement} */ (document.getElementById('showFloor'));
     if (scenarioSelect) {
       scenarioSelect.addEventListener('change', () => {
         setScenarioManaged(scenarioSelect.value);
         // after scenario changes, keep orbit target centered on model
         if (modelRoot) updateControlsTargetFromObject(camera, controls, modelRoot);
+        // For sci‑fi garage, also snap immediately using validated constants
+        if (modelRoot && scenarioSelect.value === 'sci-fi_garage') {
+          try { snapModelToScenarioFloor(); } catch (_) {}
+        }
       });
     }
-    if (showFloorCheckbox) {
-      showFloorCheckbox.addEventListener('change', () => {
-        if (floorMesh) floorMesh.visible = showFloorCheckbox.checked;
-      });
-    }
+    // Floor plane is always hidden now
+    if (floorMesh) floorMesh.visible = false;
 
-    // Vertical offset controls
-    yOffsetRange = /** @type {HTMLInputElement} */ (document.getElementById('yOffsetRange'));
-    yOffsetValue = /** @type {HTMLElement} */ (document.getElementById('yOffsetValue'));
-    nudgeDownBtn = /** @type {HTMLButtonElement} */ (document.getElementById('nudgeDownBtn'));
-    nudgeUpBtn = /** @type {HTMLButtonElement} */ (document.getElementById('nudgeUpBtn'));
-    saveScenarioOffsetBtn = /** @type {HTMLButtonElement} */ (document.getElementById('saveScenarioOffsetBtn'));
+    // Vertical offset UI removed; keep defaults and programmatic snapping only
+    yOffsetRange = null; yOffsetValue = null; nudgeDownBtn = null; nudgeUpBtn = null; saveScenarioOffsetBtn = null;
 
-    if (yOffsetRange) yOffsetRange.addEventListener('input', () => { userYOffset = Number(yOffsetRange.value); applyVerticalOffset(); updateYOffsetUI(); });
-    if (nudgeDownBtn) nudgeDownBtn.addEventListener('click', () => { userYOffset = Number((userYOffset - 0.01).toFixed(3)); applyVerticalOffset(); updateYOffsetUI(); });
-    if (nudgeUpBtn) nudgeUpBtn.addEventListener('click', () => { userYOffset = Number((userYOffset + 0.01).toFixed(3)); applyVerticalOffset(); updateYOffsetUI(); });
-    if (saveScenarioOffsetBtn) saveScenarioOffsetBtn.addEventListener('click', () => {
-      scenarioYOffsetDefaults[currentScenarioKey] = (scenarioYOffsetDefaults[currentScenarioKey] ?? 0) + userYOffset;
-      userYOffset = 0;
-      updateYOffsetUI();
-      applyVerticalOffset();
-      console.log('[offset] saved default for', currentScenarioKey, '->', scenarioYOffsetDefaults[currentScenarioKey]);
-    });
-    updateYOffsetUI();
-
-    // Extra position readouts and manual nudge
-    const yAbsEl = document.getElementById('yAbs');
-    const yBaseEl = document.getElementById('yBase');
-    const yDecBtn = /** @type {HTMLButtonElement} */ (document.getElementById('yDecBtn'));
-    const yIncBtn = /** @type {HTMLButtonElement} */ (document.getElementById('yIncBtn'));
-    const copyPosBtn = /** @type {HTMLButtonElement} */ (document.getElementById('copyPosBtn'));
+    // Remove position readouts and manual nudge controls
     const zoomInBtn = /** @type {HTMLButtonElement} */ (document.getElementById('zoomInBtn'));
     const zoomOutBtn = /** @type {HTMLButtonElement} */ (document.getElementById('zoomOutBtn'));
 
-    function updateReadoutsLocal() {
-      if (!modelRoot) return;
-      if (yAbsEl) yAbsEl.textContent = modelRoot.position.y.toFixed(3);
-      if (yBaseEl) yBaseEl.textContent = modelYOffsetBase.toFixed(3);
-    }
+    function updateReadoutsLocal() { /* removed UI */ }
     updateReadouts = updateReadoutsLocal;
-    function nudgeY(amount) {
-      if (!modelRoot) return;
-      userYOffset = Number((userYOffset + amount).toFixed(3));
-      applyVerticalOffset();
-      updateYOffsetUI();
-    }
-    if (yDecBtn) yDecBtn.addEventListener('click', () => nudgeY(-0.01));
-    if (yIncBtn) yIncBtn.addEventListener('click', () => nudgeY(+0.01));
-    if (copyPosBtn) copyPosBtn.addEventListener('click', () => {
-      if (!modelRoot) return;
-      const pos = modelRoot.position;
-      const payload = JSON.stringify({ scenario: currentScenarioKey, position: { x: pos.x, y: pos.y, z: pos.z }, baseY: modelYOffsetBase }, null, 2);
-      navigator.clipboard?.writeText(payload);
-      console.log('[position copied]', payload);
-    });
     if (zoomInBtn) zoomInBtn.addEventListener('click', () => applyZoomDeltaExt(camera, controls, -0.2));
     if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => applyZoomDeltaExt(camera, controls, +0.2));
     window.addEventListener('keydown', (e) => {
@@ -380,6 +350,8 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
             applyColorToModel('#ffffff');
             buildMaterialRegistry();
             populateTextureTogglesFromMaterialRegistry();
+            // Apply initial line color if control exists
+            if (lineColorInputEl) applyLineColor(lineColorInputEl.value || '#ffffff');
           } else {
             removeDefaultTextureMapsFromModel(true);
             applyColorToModel('#ffffff');
@@ -485,6 +457,29 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
   function restoreMaterial003BaseMap() { if (!modelRoot) return; restoreMaterial003BaseMapExt(modelRoot); }
 
   // (logo helper functions moved to materials_logo.js)
+
+  // Apply color only to the material named exactly 'LINHAS • Linha'
+  function applyLineColor(hex) {
+    if (!modelRoot) return;
+    try {
+      const norm = (s) => (s || '').toString().trim().toLowerCase();
+      modelRoot.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const meshName = norm(child.name);
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const m of mats) {
+          if (!m || typeof m.name !== 'string') continue;
+          const matName = norm(m.name);
+          const isTargetMesh = meshName === 'linhas' || meshName.includes('linhas');
+          const isTargetMat = matName === 'linha' || /^linha\b/.test(matName);
+          if (isTargetMesh && isTargetMat && m.color) {
+            m.color.set(hex);
+            m.needsUpdate = true;
+          }
+        }
+      });
+    } catch (_) { /* ignore */ }
+  }
 
   // Apply solid color to all materials
   function applyColorToModel(hex) { applyColorToModelExt(modelRoot, hex); }
@@ -596,7 +591,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
       floorMesh.receiveShadow = true;
       scene.add(floorMesh);
     }
-
+    floorMesh.visible = false; // keep disabled in UI
     floorMesh.scale.set(scaledSizeX, scaledSizeZ, 1);
     floorMesh.position.set(center.x, floorY, center.z);
   }
@@ -604,26 +599,69 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
 
   function snapModelToScenarioFloor() {
     if (!modelRoot) return;
+    const scenarioKey = scenarioManager?.getCurrentScenarioKey?.();
+    // Sci‑fi garage: use validated placement constants supplied
+    if (scenarioKey === 'sci-fi_garage') {
+      modelRoot.position.set(0, -0.54391561635228, 0);
+      // Baseline after contact should equal current world Y
+      modelYOffsetBase = -0.54391561635228;
+      updateFloorUnderModel();
+      frameObject3D(modelRoot);
+      updateControlsTargetFromModel();
+      return;
+    }
     // 1) Find scenario floor Y using a downward ray from above the model center
     const box = new THREE.Box3().setFromObject(modelRoot);
     const center = new THREE.Vector3();
     box.getCenter(center);
 
     const raycaster = new THREE.Raycaster();
-    // Cast UP from below the model to find the first surface above – typically the floor
-    const rayOrigin = new THREE.Vector3(center.x, box.min.y - 1000, center.z);
-    const rayDirection = new THREE.Vector3(0, 1, 0);
+    let rayOrigin;
+    let rayDirection;
+    if (scenarioKey === 'sci-fi_garage') {
+      // Cast DOWN from just below the model to find the first surface beneath it (platform)
+      rayOrigin = new THREE.Vector3(center.x, box.min.y - 0.01, center.z);
+      rayDirection = new THREE.Vector3(0, -1, 0);
+    } else {
+      // Default: cast UP from below to intersect helper floor plane
+      rayOrigin = new THREE.Vector3(center.x, box.min.y - 1000, center.z);
+      rayDirection = new THREE.Vector3(0, 1, 0);
+    }
     raycaster.set(rayOrigin, rayDirection);
 
     const candidates = [];
     const scenarioRoot = scenarioManager?.getScenarioRoot?.();
-    if (floorMesh && floorMesh.visible) candidates.push(floorMesh);
+    // For sci-fi garage, prefer scenario geometry for accurate floor snap
+    if (scenarioKey === 'sci-fi_garage' && scenarioRoot) {
+      candidates.push(scenarioRoot);
+    } else if (floorMesh && floorMesh.visible) {
+      candidates.push(floorMesh);
+    }
     if (candidates.length === 0) return;
 
     const intersections = raycaster.intersectObjects(candidates, true);
     if (!intersections.length) return;
-    const hit = intersections[0];
-    const targetY = hit.point.y;
+    let hit = intersections[0];
+    if (scenarioKey === 'sci-fi_garage') {
+      // Choose the closest upward-facing hit that is below the model bottom
+      for (const i of intersections) {
+        const below = i.point.y <= box.min.y + 0.05;
+        const face = i.face;
+        let up = false;
+        if (face) {
+          const n = face.normal.clone();
+          i.object.updateMatrixWorld(true);
+          n.transformDirection(i.object.matrixWorld);
+          up = n.y > 0.3;
+        }
+        if (below && up) { hit = i; break; }
+      }
+    }
+    let targetY = hit.point.y;
+    if (scenarioKey === 'sci-fi_garage') {
+      // Fine-tuned lift so the model rests on the platform without floating
+      targetY += 0.025;
+    }
 
     // 2) Move model so its bottom sits just above targetY
     const epsilon = 0.002; // slight lift to avoid z-fight
@@ -667,10 +705,15 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
               modelYOffsetBase = modelRoot.position.y;
             }
             if (currentScenarioKey === 'sci-fi_garage' && modelRoot) {
-              modelRoot.position.set(0, 0.46088310371321484, 0);
-            modelYOffsetBase = modelRoot.position.y;
+              // Place to validated pose first
+              modelRoot.position.set(0, -0.54391561635228, 0);
+              modelYOffsetBase = -0.54391561635228;
+              updateFloorUnderModel();
+              // Delay snap slightly to ensure scenario meshes are ready
+              setTimeout(() => { try { snapModelToScenarioFloor(); } catch (_) {} }, 350);
+            } else {
+              snapModelToScenarioFloor();
             }
-            snapModelToScenarioFloor();
             applyVerticalOffset();
             setPleasantCameraView();
           } catch (e) {
