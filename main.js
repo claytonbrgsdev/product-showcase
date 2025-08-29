@@ -6,7 +6,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
  
-import { initializeLights, createFloorUplight } from './lights.js';
+import { initializeLights, createFloorUplight, createShowRoomLights } from './lights.js';
 import { createLoadingOverlay } from './overlay.js';
 import { createScenarioManager } from './scenarios.js';
 import { initializeCamera, enforceCameraDistanceClamp as clampCameraDistance, updateControlsTargetFromObject, frameObject, setPleasantCameraView as setPleasantView, applyZoomDelta as applyZoomDeltaExt } from './camera.js';
@@ -247,6 +247,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     // Lights (setup and UI bindings moved to lights.js)
     const { hemi, ambient, windowHemisphere, directionalLight, directionalLight2, directionalKey, updateLightsOrbit } = initializeLights(scene);
     const { uplight: floorUplight, updateFloorUplight } = createFloorUplight(scene);
+    const { showRoomGroup, updateShowRoomLights } = createShowRoomLights(scene);
 
     // Main lights only; no cinematic-only lights to keep consistent lighting
 
@@ -343,6 +344,8 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
         if (modelRoot && scenarioSelect.value === 'sci-fi_garage') {
           try { snapModelToScenarioFloor(); } catch (_) {}
         }
+        // Toggle showroom lights visibility per scenario (only in Show Room)
+        try { if (showRoomGroup) showRoomGroup.visible = (scenarioSelect.value === 'sci-fi_garage'); } catch (_) {}
       });
     }
     // Floor plane is always hidden now
@@ -399,6 +402,7 @@ import { loadImageElement, copyTextureTransform, createSquareFitCanvas, computeU
     // Update lights orbiting (use fixed timestep ~16ms)
     try { updateLightsOrbit && updateLightsOrbit(0.016, modelRoot); } catch (_) {}
     try { updateFloorUplight && updateFloorUplight(modelRoot); } catch (_) {}
+    try { updateShowRoomLights && updateShowRoomLights(0.016, modelRoot); } catch (_) {}
     if (cinematic && cinematic.isEnabled()) {
       // Approx delta since requestAnimationFrame gives timestamp in ms
       cinematic.update(0.016, modelRoot);

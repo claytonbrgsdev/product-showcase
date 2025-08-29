@@ -197,3 +197,61 @@ export function createFloorUplight(scene) {
 export function createFloorAmberLights() { return { amberLights: [], updateFloorAmbers: () => {} }; }
 
 
+
+// Show Room specific lights: isolated group not used in Galpão
+export function createShowRoomLights(scene) {
+  const group = new THREE.Group();
+  group.visible = false; // off by default; enabled only for Show Room
+
+  // Clean, bright showroom key/fill/rim
+  const srAmbient = new THREE.AmbientLight(0xffffff, 0.1);
+  group.add(srAmbient);
+
+  const srKey = new THREE.DirectionalLight(0xffffff, 1.6);
+  srKey.position.set(2.5, 4.5, 2.0);
+  srKey.castShadow = true;
+  srKey.shadow.mapSize.set(2048, 2048);
+  group.add(srKey);
+  group.add(srKey.target);
+
+  const srFill = new THREE.DirectionalLight(0xffffff, 0.8);
+  srFill.position.set(-2.0, 3.0, -1.5);
+  group.add(srFill);
+  group.add(srFill.target);
+
+  const srRim = new THREE.DirectionalLight(0xffffff, 0.9);
+  srRim.position.set(0.0, 3.5, -3.5);
+  group.add(srRim);
+  group.add(srRim.target);
+
+  // Subtle floor up-spot for underglow accent
+  const srUp = new THREE.SpotLight(0xffffff, 0.5, 20, Math.PI / 6, 0.3, 1.0);
+  srUp.position.set(0, 0.08, 0);
+  group.add(srUp);
+  group.add(srUp.target);
+
+  scene.add(group);
+
+  function updateShowRoomLights(deltaSeconds = 0, modelRoot) {
+    if (!group.visible || !modelRoot) return;
+    try {
+      const box = new THREE.Box3().setFromObject(modelRoot);
+      const center = new THREE.Vector3();
+      const size = new THREE.Vector3();
+      box.getCenter(center);
+      box.getSize(size);
+      const radius = Math.max(size.x, size.y, size.z) * 0.5 || 1;
+      srKey.target.position.copy(center);
+      srFill.target.position.copy(center);
+      srRim.target.position.copy(center);
+      srUp.target.position.set(center.x, center.y + radius * 0.6, center.z);
+      srKey.target.updateMatrixWorld();
+      srFill.target.updateMatrixWorld();
+      srRim.target.updateMatrixWorld();
+      srUp.target.updateMatrixWorld();
+    } catch (_) {}
+  }
+
+  return { showRoomGroup: group, updateShowRoomLights };
+}
+
